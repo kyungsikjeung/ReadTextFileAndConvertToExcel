@@ -17,10 +17,11 @@ const readline = require('readline');
 var Excel = require("exceljs");
 
 /* 저장할 액셀 파일명 - 현재 폴더에 아웃풋 폴더에 csv파일 저장 */
-var fileName ="./output/20210227.csv";
+var fileName ="./output/20210228.csv";
 /* 테라텀 파일 데이터 폴더에 저장할것 - 현재폴더의 data폴더에 테라텀 데이터 저장*/
 var teratermTextFile = "/20210226.txt";
 
+/*  */
 var options = {
     filename: fileName, // existing filepath
     useStyles: true, // Default
