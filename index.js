@@ -17,9 +17,9 @@ const readline = require('readline');
 var Excel = require("exceljs");
 
 /* 저장할 액셀 파일명 - 현재 폴더에 아웃풋 폴더에 csv파일 저장 */
-var fileName ="./output/20210228.csv";
+var fileName ="./output/people(0310).csv";
 /* 테라텀 파일 데이터 폴더에 저장할것 - 현재폴더의 data폴더에 테라텀 데이터 저장*/
-var teratermTextFile = "/20210226.txt";
+var teratermTextFile = "/people(0310).txt";
 
 /*  */
 var options = {
@@ -57,7 +57,7 @@ var options = {
 // 센서 데이터에 보여줄 데이터
 var category = [
     { header:"Time", key:"time", width:10 },
-    { header:"Volt", key:"volt", width:32 },
+    { header:"Volt", key:"volt", width:10 },
     { header:"RS", key:"rs", width:10 }
 ];
 
@@ -105,8 +105,9 @@ fs.readFileSync(path.join(__dirname, './data') + teratermTextFile, 'utf8').toStr
     var volt=parseFloat (line.substring(32,39));
     var rs = parseFloat(line.substring(44,49));
     var obj = {time:time,volt:volt,rs:rs};
-    if(line.includes('2021-02-27')){
+    if(line.includes('2021-03-10') && !line.includes('N') ){
         if(line.includes('Volt1')){
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('B').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('J').value=rs;
             worksheet1.addRow(obj);
@@ -120,31 +121,37 @@ fs.readFileSync(path.join(__dirname, './data') + teratermTextFile, 'utf8').toStr
             worksheet2.addRow(obj);
         }
         else if(line.includes('Volt3')){
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('D').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('L').value=rs;
             worksheet3.addRow(obj);
         }
         else if(line.includes('Volt4')){
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('E').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('M').value=rs;
             worksheet4.addRow(obj);
         }
         else if(line.includes('Volt5')){
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('F').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('N').value=rs;
             worksheet5.addRow(obj);
         }
         else if(line.includes('Volt6')){
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('G').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('O').value=rs;
             worksheet6.addRow(obj);
         }
         else if(line.includes('Volt7')){
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('H').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('P').value=rs;
             worksheet7.addRow(obj);
         }
         else if(line.includes('Volt8')){ // 주의 마지막 센서에 rowNum++ 해주기
+            worksheetTotalData.getRow(rowNum).getCell('A').value=time;
             worksheetTotalData.getRow(rowNum).getCell('I').value=volt;
             worksheetTotalData.getRow(rowNum).getCell('Q').value=rs;
             worksheet8.addRow(obj);

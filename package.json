@@ -7,7 +7,8 @@
     "exceljs": "^4.2.0",
     "fs": "^0.0.1-security",
     "node-excel-stream": "^1.2.1",
-    "readline": "^1.3.0"
+    "readline": "^1.3.0",
+    "underscore": "^1.12.0"
   },
   "devDependencies": {},
   "scripts": {
