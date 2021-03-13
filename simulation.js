@@ -1,3 +1,4 @@
+// Library
 var fs = require('fs'); 
 var path = require('path'); 
 const readline = require('readline'); 
@@ -5,21 +6,22 @@ var Excel = require("exceljs");
 var _ = requrie('underscore');
 
 var LED = [];
-// usersetting
+// File Setting
 var fileConfig = {
     fileName :"./output/voc_0311_withPP2.csv",
     teratermTextFile: "/voc_0311_withPP1.txt",
 };
 
+// User Variable Setting
 var variableConfig = {
-    date : '2021-03-11',
-    startHour : 10,
-    endHour : 12, 
-    numberOfSamplingForAvg : 6,
-    pulse : 20,
-    timePulse : 24,
-    slope1 : 0.85,
-    slope2 : 0.9
+    date : '2021-03-11', //시작일
+    startHour : 10, // 시작시간
+    endHour : 12,  // 완료시간
+    numberOfSamplingForAvg : 6, //5*x 초 , where x = numberOfSamplingForAvg
+    pulse : 20, // 허용범위 +- 진폭
+    timePulse : 24, // 허용 범위 폭
+    slope1 : 0.9, // Blue 
+    slope2 : 0.85 // Orange
 };
 
 var options = { 
@@ -69,8 +71,38 @@ worksheet6.columns = category;
 worksheet7.columns = category;
 worksheet8.columns = category;
 
-function doSensor(time,volt,rs,averageOfRsValues){
-    
+var threshholdTime = 0;
+var allowedValue = 0;
+var rsReferenceValue = [0,0,0,0,0,0,0,0]
+
+function doSensor(sensorId,time,volt,rs,averageOfRsValues){
+    var Led = 'N';
+    // 공기가 좋아질떄 기준점 업데이트
+    if(averageOfRsValues > rsReferenceValue[sensorId-1]){
+        rsReferenceValue[sensorId-1] = averageOfRsValues;
+        threshholdTime = 0
+    }
+    // 평균값이 허용 범위 값을 벗어 났을떄 허용 범위 평균값으로 업데이트
+    if(averageOfRsValues > allowedValue + variableConfig.pulse || averageOfRsValues < allowedValue + variableConfig.pulse){
+        allowedValue = averageOfRsValues;
+        threshholdTime = 0;
+    }else{
+        threshholdTime++;
+    }
+    // 허용범위안에서 일정 시간이 경과하였을떄에 기준값을 내려줌
+    if(threshholdTime >= variableConfig.timePulse){
+        threshholdTime = 0;
+        rsReferenceValue[sensorId-1]  = rsReferenceValue[sensorId-1] - variableConfig.pulse;
+    }
+    var AdcResult = parseFloat(averageOfRsValues)/parseFloat(rsReferenceValue[sensorId-1])
+    if(AdcResult > variableConfig.slope1){
+        Led = 'Blue'
+    }else if(AdcResult> variableConfig.slope2){
+        Led = 'Orange'
+    }else{
+        Led = 'Red'
+    }
+    return 
 };
 
 /* 제품 켜지고 30분 후 날짜 , 원하는 시간 데이터 받아오기  */
@@ -93,18 +125,20 @@ var averageSensorArr = [];
 // 텍스트 파일을 데이터를 라인별로 읽어 들여와 액셀에 데이터 저장
 fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'utf8').toString().split('\n').forEach(function (line) { 
     if(isValidDataType(line)){ 
+        // 기본 값
         var time = line.substring(12,17);
         var volt=parseFloat (line.substring(32,39));
-        var rs = parseFloat(line.substring(44,49));
-        var averageOfRsValues = 0;
-        if(cntForAvg == variableConfig.numberOfSamplingForAvg){
+        var rs = parseFloat(line.substring(44,49)); 
+        var averageOfRsValues = 0; // 5초간 Rs값 샘플링횟수가 x개(variableConfig.numberOfSamplingForAvg) 데이터들의 Rs 값 평균
+        
+        if(cntForAvg == variableConfig.numberOfSamplingForAvg){ // CntAvg를 +1 해주면서 x번쨰 되었을떄 평균값 업데이트 (averageOfRsValues), x 도달하면 averageOfRsValues
             averageOfRsValues = _.mean(avg) || 0;
             averageSensorArr=[];
             cntForAvg = 0;
         }
         averageSensorArr.push(rs);
         cntForAvg ++;
-        doSensor(time,volt,rs,averageOfRsValues);
+        doSensor(time,volt,rs,averageOfRsValues); // 평균값으로 기준값 받기
         var obj = {time:time,volt:volt,rs:rs, rsCurrent:rsCurrent, rsAir: rsAir };
         if(line.includes('Volt1')){
             worksheet1.addRow(obj);
