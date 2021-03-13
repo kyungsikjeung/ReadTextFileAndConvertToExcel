@@ -5,13 +5,12 @@ const readline = require('readline');
 var Excel = require("exceljs");
 var _ = requrie('underscore');
 
-var LED = [];
 // File Setting
 var fileConfig = {
     fileName :"./output/voc_0311_withPP2.csv",
     teratermTextFile: "/voc_0311_withPP1.txt",
+    sensorNum : 8
 };
-
 // User Variable Setting
 var variableConfig = {
     date : '2021-03-11', //시작일
@@ -20,19 +19,22 @@ var variableConfig = {
     numberOfSamplingForAvg : 6, //5*x 초 , where x = numberOfSamplingForAvg
     pulse : 20, // 허용범위 +- 진폭
     timePulse : 24, // 허용 범위 폭
-    slope1 : 0.9, // Blue 
-    slope2 : 0.85 // Orange
+    blueSlope : 0.9, // Blue 
+    orangeSlope : 0.85, // Orange
+    referenceDown : 200
 };
-
+// excelOption
 var options = { 
-    filename: fileConfig.fileName, // existing filepath
-    useStyles: true, // Default
-    useSharedStrings: true // Default
+    filename: fileConfig.fileName, 
+    useStyles: true, 
+    useSharedStrings: true 
 };
 
-/* 센서별 Sheet 추가 */
+
+/* setting workbook with options */
 var workbook = new Excel.stream.xlsx.WorkbookWriter(options);
-var totalData = workbook.addWorksheet("totalData");
+
+/* create work sheet */
 var sheet1 = workbook.addWorksheet("Sensor1");
 var sheet2 = workbook.addWorksheet("Sensor2");
 var sheet3 = workbook.addWorksheet("Sensor3");
@@ -40,9 +42,9 @@ var sheet4 = workbook.addWorksheet("Sensor4");
 var sheet5 = workbook.addWorksheet("Sensor5");
 var sheet6 = workbook.addWorksheet("Sensor6");
 var sheet7 = workbook.addWorksheet("Sensor7");
-var sheet7 = workbook.addWorksheet("Sensor8");
+var sheet8 = workbook.addWorksheet("Sensor8");
 
-  /* 센서별 Sheet 할당 */
+/* getWork Sheet */
 var worksheet1 = workbook.getWorksheet("Sensor1");
 var worksheet2 = workbook.getWorksheet("Sensor2");
 var worksheet3 = workbook.getWorksheet("Sensor3");
@@ -52,16 +54,21 @@ var worksheet6 = workbook.getWorksheet("Sensor6");
 var worksheet7 = workbook.getWorksheet("Sensor7");
 var worksheet8 = workbook.getWorksheet("Sensor8");
 
-// 센서 데이터에 보여줄 데이터
+// colum setting 
 var category = [
     { header:"Time", key:"time", width:10 },
     { header:"Volt", key:"volt", width:10 },
     { header:"RS", key:"rs", width:10 },
-    { header:"RsCurrent", key:"rsCurrent", width:10 },
-    { header:"RsAir", key:"rsAir", width:10 }
+    { header:"AVG", key:"avg", width:10 },
+    { header:"Reference", key:"reference", width:10 },
+    { header:"Buffer", key:"buffer", width:10 },
+    { header:"BufferMax", key:"bufferMax", width:10 },
+    { header:"BufferMin", key:"bufferMin", width:10 },
+    { header:"BlueSlope", key:"blueSlope", width:10 },
+    { header:"OrangeSlope", key:"orangeSlope", width:10 }
 ];
 
-/* 시트에 항목 할당 */
+/* assign category info to sheet */
 worksheet1.columns = category;
 worksheet2.columns = category;
 worksheet3.columns = category;
@@ -71,97 +78,124 @@ worksheet6.columns = category;
 worksheet7.columns = category;
 worksheet8.columns = category;
 
-var threshholdTime = 0;
-var allowedValue = 0;
-var rsReferenceValue = [0,0,0,0,0,0,0,0]
+// global variable based on sensorID
+var threshholdTime = [0,0,0,0,0,0,0,0];
+var buffer = [0,0,0,0,0,0,0,0];
+var reference = [0,0,0,0,0,0,0,0];
+var LED = [];
 
-function doSensor(sensorId,time,volt,rs,averageOfRsValues){
+/*  air quility index logic
+*   return : time,rs, avg, reference ,buffer,bufferMax: buffer[sensorId-1] + pulse, bufferMin : buffer[sensorId-1] - min, Led}
+*/
+function doSensor(sensorId,time,volt,rs,avg){
     var Led = 'N';
-    // 공기가 좋아질떄 기준점 업데이트
-    if(averageOfRsValues > rsReferenceValue[sensorId-1]){
-        rsReferenceValue[sensorId-1] = averageOfRsValues;
-        threshholdTime = 0
+    // clean air
+    if(avg > reference[sensorId-1]){
+        reference[sensorId-1] = avg;
+        threshholdTime[sensorId-1] = 0
     }
-    // 평균값이 허용 범위 값을 벗어 났을떄 허용 범위 평균값으로 업데이트
-    if(averageOfRsValues > allowedValue + variableConfig.pulse || averageOfRsValues < allowedValue + variableConfig.pulse){
-        allowedValue = averageOfRsValues;
-        threshholdTime = 0;
+    // adjust buffer zone
+    if(avg > buffer[sensorId-1] + variableConfig.pulse || avg < buffer[sensorId-1] + variableConfig.pulse){
+        buffer[sensorId-1] = avg;
+        threshholdTime[sensorId-1] = 0;
     }else{
-        threshholdTime++;
+        threshholdTime[sensorId-1]++;
     }
-    // 허용범위안에서 일정 시간이 경과하였을떄에 기준값을 내려줌
-    if(threshholdTime >= variableConfig.timePulse){
-        threshholdTime = 0;
-        rsReferenceValue[sensorId-1]  = rsReferenceValue[sensorId-1] - variableConfig.pulse;
+    // when the avg is in buffer zone, update the reference value
+    if(threshholdTime[sensorId-1] >= variableConfig.timePulse){
+        threshholdTime[sensorId-1] = 0;
+        reference[sensorId-1]  = reference[sensorId-1] - variableConfig.pulse;
     }
-    var AdcResult = parseFloat(averageOfRsValues)/parseFloat(rsReferenceValue[sensorId-1])
-    if(AdcResult > variableConfig.slope1){
+
+    // airquility index logic
+    var AdcResult = parseFloat(avg)/parseFloat(reference[sensorId-1])
+    if(AdcResult > variableConfig.blueSlope){
         Led = 'Blue'
-    }else if(AdcResult> variableConfig.slope2){
+    }else if(AdcResult> variableConfig.orangeSlope){
         Led = 'Orange'
     }else{
         Led = 'Red'
     }
-    return 
+    return {time:time, rs:rs, avg: avg, reference : reference[sensorId-1], buffer : buffer[sensorId-1],  bufferMax: buffer[sensorId-1] + pulse, bufferMin : buffer[sensorId-1] - min, Led}
 };
 
-/* 제품 켜지고 30분 후 날짜 , 원하는 시간 데이터 받아오기  */
+/* fileConfig에서 설정된 날짜 , 원하는 시간이면 제품 ID 반환 
+* @Param line : 텍스트 한라인  
+* return 제품 ID
+*/
 function isValidDataType(line){
-    // 정해진 시간 범위인지 체크
+    // check valid date type from fileConfig.date, startHour, endHour
     var isValidTime = false;
+    var deviceID = -1;
     _.range(variableConfig.startHour,variableConfig.endHour+1).map(row, function(row){
         var isIncludingTime = line.includes(row);
         if(line.includes(isIncludingTime)){
             isValidTime = (isValidTime || isIncludingTime)
-        } 
+        }
+        indexVolt = line.indexOf('Volt'); 
+        if(indexVolt == -1){
+            isValidTime = false;
+        }
+        var deviceId = line[indexVolt+4]; 
     })
-    // 30분 지난 데이터 인지, 정해진 시간 범위인지, 특정 날짜인지 확인
-    return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date)
+    return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date) ? deviceId : -1;
 };
 
 var rowNum = 2;
 var cntForAvg = 0;
 var averageSensorArr = [];
-// 텍스트 파일을 데이터를 라인별로 읽어 들여와 액셀에 데이터 저장
+
 fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'utf8').toString().split('\n').forEach(function (line) { 
-    if(isValidDataType(line)){ 
-        // 기본 값
+    // find device Id which has the valid data
+    var deviceID = isValidDataType(line);
+    if(deviceID > 0 ){ 
         var time = line.substring(12,17);
         var volt=parseFloat (line.substring(32,39));
         var rs = parseFloat(line.substring(44,49)); 
-        var averageOfRsValues = 0; // 5초간 Rs값 샘플링횟수가 x개(variableConfig.numberOfSamplingForAvg) 데이터들의 Rs 값 평균
+        var avg = 0; 
+        var doSensorFlag = false;
         
-        if(cntForAvg == variableConfig.numberOfSamplingForAvg){ // CntAvg를 +1 해주면서 x번쨰 되었을떄 평균값 업데이트 (averageOfRsValues), x 도달하면 averageOfRsValues
+        if(cntForAvg == variableConfig.numberOfSamplingForAvg){ 
             averageOfRsValues = _.mean(avg) || 0;
             averageSensorArr=[];
             cntForAvg = 0;
+            doSensorFlag = true;
         }
+
         averageSensorArr.push(rs);
         cntForAvg ++;
-        doSensor(time,volt,rs,averageOfRsValues); // 평균값으로 기준값 받기
-        var obj = {time:time,volt:volt,rs:rs, rsCurrent:rsCurrent, rsAir: rsAir };
+        
         if(line.includes('Volt1')){
+            // function doSensor(sensorId,time,volt,rs,averageOfRsValues){
+            var obj = doSensorFlag ? dosensordoSensor(1,time,volt,rs,averageOfRsValues) : {time:time,volt:volt,averageOfRsValues:averageOfRsValues}
             worksheet1.addRow(obj);
         }
         else if(line.includes('Volt2')){
+            var obj = doSensorFlag ? dosensordoSensor(1,time,volt,rs,averageOfRsValues) : {time:time,volt:volt,averageOfRsValues:averageOfRsValues}
             worksheet2.addRow(obj);
         }
         else if(line.includes('Volt3')){
+            var obj = doSensorFlag ? dosensordoSensor(1,time,volt,rs,averageOfRsValues) : {time:time,volt:volt,averageOfRsValues:averageOfRsValues}
             worksheet3.addRow(obj);
         }
         else if(line.includes('Volt4')){
+            var obj = doSensor();
             worksheet4.addRow(obj);
         }
         else if(line.includes('Volt5')){
+            var obj = doSensor();
             worksheet5.addRow(obj);
         }
         else if(line.includes('Volt6')){
+            var obj = doSensor();
             worksheet6.addRow(obj);
         }
         else if(line.includes('Volt7')){
+            var obj = doSensor();
             worksheet7.addRow(obj);
         }
         else if(line.includes('Volt8')){ // 주의 마지막 센서에 rowNum++ 해주기
+            var obj = doSensor();
             worksheet8.addRow(obj);
             rowNum++;
         }
