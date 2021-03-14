@@ -83,6 +83,14 @@ var threshholdTime = [0,0,0,0,0,0,0,0]; // buffer
 var buffer = [0,0,0,0,0,0,0,0]; 
 var reference = [0,0,0,0,0,0,0,0];
 var LED = [];
+var rowNum = 2;
+var cntForAvg = 0;
+// X초가 지났을떄 실제 평균 값 저장
+var avgSensors = [0,0,0,0,0,0,0,0]; // Rs
+var avgFlag = [false,false,false,false,false,false,false,false];
+var cntSamplingNumByDevice = [0,0,0,0,0,0,0,0];
+// x초 이전의 센서들의 데이터들을 저장 (2D array)
+var averageSensorArr = matrix(fileConfig.sensorNum,variableConfig.numberOfSamplingForAvg,0);
 
 /*  air quility index logic
 *   return : time,rs, avg, reference ,buffer,bufferMax: buffer[sensorId-1] + pulse, bufferMin : buffer[sensorId-1] - min, Led}
@@ -160,15 +168,36 @@ function matrix( rows, cols, defaultValue){
   }
 
 
-var rowNum = 2;
-var cntForAvg = 0;
-// X초가 지났을떄 실제 평균 값 저장
-var avgSensors = [0,0,0,0,0,0,0,0]; // Rs
-var avgFlag = [false,false,false,false,false,false,false,false];
-var cntSamplingNumByDevice = [0,0,0,0,0,0,0,0];
-
-// x초 이전의 센서들의 데이터들을 저장 (2D array)
-var averageSensorArr = matrix(fileConfig.sensorNum,variableConfig.numberOfSamplingForAvg,0);
+  function getWorkSheetByDeviceID(deviceID){
+    var workSheet;
+    switch(deviceID){
+        case 1:
+            workSheet = worksheet1;
+            break;
+        case 2:
+            workSheet = worksheet2;
+            break;
+        case 3:
+            workSheet = worksheet3;
+            break;
+        case 4:
+            workSheet = worksheet4;
+            break;
+        case 5:
+            workSheet = worksheet5;
+            break;
+        case 6:
+            workSheet = worksheet6;
+            break;
+        case 7:
+            workSheet = worksheet7;
+            break;
+        case 8:
+            workSheet = worksheet8;
+            break;
+    }
+    return workSheet;
+  }
 
 fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'utf8').toString().split('\n').forEach(function (line) { 
     // find device Id which has the valid data
@@ -190,6 +219,8 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
         averageSensorArr[deviceID-1][cntForAvg].push(rs);
         cntSamplingNumByDevice[deviceID-1] = cntSamplingNumByDevice[deviceID-1] + 1;
         
+
+
         if(line.includes('Volt1')){
             // function doSensor(sensorId,time,volt,rs,averageOfRsValues){
             var obj = doSensorFlag ? dosensordoSensor(1,time,volt,rs,averageOfRsValues) : {time:time,volt:volt,averageOfRsValues:averageOfRsValues}
