@@ -79,8 +79,8 @@ worksheet7.columns = category;
 worksheet8.columns = category;
 
 // global variable based on sensorID
-var threshholdTime = [0,0,0,0,0,0,0,0];
-var buffer = [0,0,0,0,0,0,0,0];
+var threshholdTime = [0,0,0,0,0,0,0,0]; // buffer
+var buffer = [0,0,0,0,0,0,0,0]; 
 var reference = [0,0,0,0,0,0,0,0];
 var LED = [];
 
@@ -124,46 +124,71 @@ function doSensor(sensorId,time,volt,rs,avg){
 * return 제품 ID
 */
 function isValidDataType(line){
-    // check valid date type from fileConfig.date, startHour, endHour
     var isValidTime = false;
     var deviceID = -1;
+    // 시작 & 종료 시간 Validation
     _.range(variableConfig.startHour,variableConfig.endHour+1).map(row, function(row){
         var isIncludingTime = line.includes(row);
         if(line.includes(isIncludingTime)){
             isValidTime = (isValidTime || isIncludingTime)
         }
+        // Volt단어 있는지 확인
         indexVolt = line.indexOf('Volt'); 
         if(indexVolt == -1){
             isValidTime = false;
         }
         var deviceId = line[indexVolt+4]; 
-    })
-    return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date) ? deviceId : -1;
+    }) 
+    return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date) ? deviceId : -1; // Validation 성공하면 장치 ID 반환 , 실패하면 -1 반환
 };
+
+/* 2D array 만들기 @See https://stackoverflow.com/questions/3689903/how-to-create-a-2d-array-of-zeroes-in-javascript */
+function matrix( rows, cols, defaultValue){
+    var arr = [];
+    // Creates all lines:
+    for(var i=0; i < rows; i++){
+        // Creates an empty line
+        arr.push([]);
+        // Adds cols to the empty line:
+        arr[i].push( new Array(cols));
+        for(var j=0; j < cols; j++){
+          // Initializes:
+          arr[i][j] = defaultValue;
+        }
+    }
+  return arr;
+  }
+
 
 var rowNum = 2;
 var cntForAvg = 0;
-var averageSensorArr = [];
+// X초가 지났을떄 실제 평균 값 저장
+var avgSensors = [0,0,0,0,0,0,0,0]; // Rs
+var avgFlag = [false,false,false,false,false,false,false,false];
+var cntSamplingNumByDevice = [0,0,0,0,0,0,0,0];
+
+// x초 이전의 센서들의 데이터들을 저장 (2D array)
+var averageSensorArr = matrix(fileConfig.sensorNum,variableConfig.numberOfSamplingForAvg,0);
 
 fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'utf8').toString().split('\n').forEach(function (line) { 
     // find device Id which has the valid data
     var deviceID = isValidDataType(line);
-    if(deviceID > 0 ){ 
+    if(deviceID > 0 ){  
         var time = line.substring(12,17);
         var volt=parseFloat (line.substring(32,39));
         var rs = parseFloat(line.substring(44,49)); 
-        var avg = 0; 
-        var doSensorFlag = false;
         
-        if(cntForAvg == variableConfig.numberOfSamplingForAvg){ 
-            averageOfRsValues = _.mean(avg) || 0;
-            averageSensorArr=[];
-            cntForAvg = 0;
-            doSensorFlag = true;
+        avgFlag[deviceID-1] = false;
+        // 30초 지났을떄 평균 한번 낸다. 
+        if(cntSamplingNumByDevice[deviceID-1] == variableConfig.numberOfSamplingForAvg){ 
+            avgSensors[deviceID-1] = _.mean(averageSensorArr[deviceID-1]) || 0;
+            averageSensorArr[deviceID-1]=[];
+            cntSamplingNumByDevice[deviceID-1] = 0;
+            avgFlag[deviceID-1] = true;
         }
 
-        averageSensorArr.push(rs);
-        cntForAvg ++;
+        averageSensorArr[deviceID-1][cntForAvg].push(rs);
+        cntSamplingNumByDevice[deviceID-1] = cntSamplingNumByDevice[deviceID-1] + 1;
         
         if(line.includes('Volt1')){
             // function doSensor(sensorId,time,volt,rs,averageOfRsValues){
