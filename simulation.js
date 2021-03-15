@@ -8,7 +8,7 @@ var _ = require('underscore');
 // File Setting
 var fileConfig = {
     teratermTextFile: "/voc_0311_withPP1.txt",
-    fileName :"./output/testalgorithm.csv",
+    fileName :"./output/testtest.csv",
     sensorNum : 8
 };
 
@@ -51,6 +51,7 @@ var sheet7 = workbook.addWorksheet("Sensor7");
 var sheet8 = workbook.addWorksheet("Sensor8");
 
 /* getWork Sheet */
+
 var worksheet1 = workbook.getWorksheet("Sensor1");
 var worksheet2 = workbook.getWorksheet("Sensor2");
 var worksheet3 = workbook.getWorksheet("Sensor3");
@@ -59,6 +60,7 @@ var worksheet5 = workbook.getWorksheet("Sensor5");
 var worksheet6 = workbook.getWorksheet("Sensor6");
 var worksheet7 = workbook.getWorksheet("Sensor7");
 var worksheet8 = workbook.getWorksheet("Sensor8");
+
 
 // colum setting 
 var category = [
@@ -89,7 +91,6 @@ worksheet8.columns = category;
 var threshholdTime = [0,0,0,0,0,0,0,0]; // buffer
 var buffer = [0,0,0,0,0,0,0,0]; 
 var reference = [0,0,0,0,0,0,0,0];
-var LED = [];
 
 // X초가 지났을떄 실제 평균 값 저장
 var avgSensors = [0,0,0,0,0,0,0,0]; // Rs
@@ -127,7 +128,6 @@ function matrix( rows, cols, defaultValue){
 *   return : time,rs, avg, reference ,buffer,bufferMax: buffer[sensorId-1] + pulse, bufferMin : buffer[sensorId-1] - min, Led}
 */
 function doSensor(sensorId,time,volt,rs,avg){
-    var Led = 'N';
     // clean air
     if(avg > reference[sensorId-1]){
         reference[sensorId-1] = avg;
@@ -149,11 +149,11 @@ function doSensor(sensorId,time,volt,rs,avg){
     // airquility index logic
     var AdcResult = parseFloat(avg)/parseFloat(reference[sensorId-1])
     if(AdcResult > variableConfig.blueSlope){
-        Led[deviceID-1] = 'Blue'
+        Led[sensorId-1] = 'Blue'
     }else if(AdcResult> variableConfig.orangeSlope){
-        Led[deviceID-1] = 'Orange'
+        Led[sensorId-1] = 'Orange'
     }else{
-        Led[deviceID-1] = 'Red'
+        Led[sensorId-1] = 'Red'
     }
     return {
         'time':time,
@@ -163,8 +163,8 @@ function doSensor(sensorId,time,volt,rs,avg){
         'reference' : reference[sensorId-1],
         'buffer' : buffer[sensorId-1],
         'bufferMax' : buffer[sensorId-1] + variableConfig.pulse,
-        'bufferMin' : bufferMin +  variableConfig.pulse,
-        'Led' : Led[deviceID-1],
+        'bufferMin' : buffer[sensorId-1] +  variableConfig.pulse,
+        'Led' : Led[sensorId-1],
         'blueSlope': variableConfig.blueSlope,
         'orangeSlope': variableConfig.orangeSlope
     }
@@ -177,56 +177,21 @@ function doSensor(sensorId,time,volt,rs,avg){
 function checkValidDateAndFindDeviceID(line){
     var isValidTime = false;
     var deviceID = -1;
-    // 시작 & 종료 시간 Validation
-    _.range(variableConfig.startHour,variableConfig.endHour+1).map(row, function(row){
-        var isIncludingTime = line.includes(row);
-        if(line.includes(isIncludingTime)){
-            isValidTime = (isValidTime || isIncludingTime)
-        }
-        // Volt단어 있는지 확인
-        indexVolt = line.indexOf('Volt'); 
-        if(indexVolt == -1){
-            isValidTime = false;
-        }
-        deviceID = line[indexVolt+4]; 
-    }) 
-    return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date) ? deviceID : -1; // Validation 성공하면 장치 ID 반환 , 실패하면 -1 반환
-};
-
-  /* 제품 아이디에 해당되는 workSheet반환
-  * @Param deviceID : 로그에 찍힌 제품의 아이디
-  * @Return : 각 Device에 해당하는 workSheet반환
-  */
-  function getWorkSheetByDeviceID(deviceID){
-    var workSheet;
-    switch(deviceID){
-        case 1:
-            workSheet = worksheet1;
-            break;
-        case 2:
-            workSheet = worksheet2;
-            break;
-        case 3:
-            workSheet = worksheet3;
-            break;
-        case 4:
-            workSheet = worksheet4;
-            break;
-        case 5:
-            workSheet = worksheet5;
-            break;
-        case 6:
-            workSheet = worksheet6;
-            break;
-        case 7:
-            workSheet = worksheet7;
-            break;
-        case 8:
-            workSheet = worksheet8;
-            break;
+    var hours = _.range(variableConfig.startHour,variableConfig.endHour+1); // 시작 시간 종료시간 배열
+    // hours돌면서 유효한 시간이 있을경우 isValidTime true 변환
+    _.each(hours, function (element, index, list) {
+        var isSameHour = line.includes(element) ? true : false;
+        isValidTime = (isValidTime || isSameHour)
+    });
+    // Volt 로 부터 
+    indexVolt = line.indexOf('Volt'); 
+    if(indexVolt == -1){
+        isValidTime = false;
     }
-    return workSheet;
-  }
+    deviceID = line[indexVolt+4];
+    //console.log(deviceID);
+    return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date) ? deviceID : -1; // Validation 성공하면 장치 ID 반환 , 실패하면 -1 반환    
+};
 
 fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'utf8').toString().split('\n').forEach(function (line) { 
     
@@ -236,7 +201,6 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
         var time = line.substring(12,17);
         var volt=parseFloat (line.substring(32,39));
         var rs = parseFloat(line.substring(44,49)); 
-
         /* 30초 지났을떄에만 평균 값 계산 및 데이터 저장, 현재 한 라인을 읽어이는것은 5초라고 생각함, 라인 6번 읽으면 30초로 간주
         * @Param cntSamplingNumByDevice : doSensor 수행되는 횟수
         * @Param averageSensorArr : Device ID에 따른 Rs값 저장, 평균을 내기 위한 디바이스별 Rs 저장 (2차배열)
@@ -245,7 +209,8 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
         */
         avgFlag[deviceID-1] = false;
         if(cntSamplingNumByDevice[deviceID-1] == variableConfig.numberOfSamplingForAvg){ 
-            avgSensors[deviceID-1] = _.mean(averageSensorArr[deviceID-1]) || 0;
+           //avgSensors[deviceID-1] = _.mean(averageSensorArr[deviceID-1]) || 0;
+           avgSensors[deviceID-1] = averageSensorArr[deviceID-1].reduce((prev, add) => prev + add, 0) / averageSensorArr[deviceID-1].length || 0
             averageSensorArr[deviceID-1]=[];
             cntSamplingNumByDevice[deviceID-1] = 0;
             avgFlag[deviceID-1] = true;
@@ -253,7 +218,7 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
 
         // 장치별 평균값 임시저장소 저장 -> 30초 지났을떄 위 if 문에서 평균 측정 및 averageSensorArr에 평균값 저장
         var cntForAvg = cntSamplingNumByDevice[deviceID-1];
-        averageSensorArr[deviceID-1][cntForAvg].push(rs);
+        averageSensorArr[deviceID-1][cntForAvg] = rs;
         cntSamplingNumByDevice[deviceID-1] = cntForAvg + 1;
 
         // 평균 30초가 안지났다면 기존의 데이터 사용, 30초 지나면 기존의 값 업데이트
@@ -261,7 +226,7 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
             'time':time,
             'volt':volt,
             'rs':rs,
-            'avg':averageSensorArr[deviceID-1],
+            'avg':avgSensors[deviceID-1],
             'reference': reference[deviceID-1],
             'buffer': buffer[deviceID-1],
             'bufferMax': buffer[deviceID-1] + variableConfig.pulse,
@@ -272,17 +237,15 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
         }
         var obj;
         if(avgFlag[deviceID-1]){
-            obj = defaultObj;
+            console.log("알고리즘 적용")
+            obj = doSensor(deviceID,time,volt,rs, avgSensors[deviceID-1]);
         }else{ // 센서값 알고리즘 적용
-            obj = dosensordoSensor(deviceID,time,volt,rs, averageSensorArr[deviceID-1]);
-            // update
-            //averageSensorArr[deviceID-1] = obj['averageSensorArr[deviceID-1]'];
-            //reference[deviceID-1] = obj['reference[deviceID-1]'];
-            //buffer[deviceID-1] = obj['buffer[deviceID-1]'];
+            console.log("알고리즘 적용안함")
+            obj = defaultObj;
         }
-        
-        //var obj = avgFlag[deviceID-1] ? dosensordoSensor(deviceID,time,volt,rs, averageSensorArr[deviceID-1]) : defaultObj
-        getWorkSheetByDeviceID(deviceID).addRow(obj)    
+        console.log(JSON.stringify(obj))
+        var sheetName = "Sensor"+String(deviceID);
+        workbook.getWorksheet(sheetName).addRow(obj);
     }
 });
 
