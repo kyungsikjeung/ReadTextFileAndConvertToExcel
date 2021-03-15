@@ -83,16 +83,16 @@ var threshholdTime = [0,0,0,0,0,0,0,0]; // buffer
 var buffer = [0,0,0,0,0,0,0,0]; 
 var reference = [0,0,0,0,0,0,0,0];
 var LED = [];
-var rowNum = 2;
-var cntForAvg = 0;
+
 // X초가 지났을떄 실제 평균 값 저장
 var avgSensors = [0,0,0,0,0,0,0,0]; // Rs
 var avgFlag = [false,false,false,false,false,false,false,false];
 var cntSamplingNumByDevice = [0,0,0,0,0,0,0,0];
-// x초 이전의 센서들의 데이터들을 저장 (2D array)
+
+// x초 이전의 장치별 Rs값 저장 (2D array)
 var averageSensorArr = matrix(fileConfig.sensorNum,variableConfig.numberOfSamplingForAvg,0);
 
-/*  air quility index logic
+/*  공기청정 상대치 검증방법 알고리즘
 *   return : time,rs, avg, reference ,buffer,bufferMax: buffer[sensorId-1] + pulse, bufferMin : buffer[sensorId-1] - min, Led}
 */
 function doSensor(sensorId,time,volt,rs,avg){
@@ -127,11 +127,11 @@ function doSensor(sensorId,time,volt,rs,avg){
     return {time:time, rs:rs, avg: avg, reference : reference[sensorId-1], buffer : buffer[sensorId-1],  bufferMax: buffer[sensorId-1] + pulse, bufferMin : buffer[sensorId-1] - min, Led}
 };
 
-/* fileConfig에서 설정된 날짜 , 원하는 시간이면 제품 ID 반환 
+/* fileConfig에서 설정된 날짜 ,원하는 시간의 데이터인가 확인, 데이터가 유효하면 제품 ID 반환 
 * @Param line : 텍스트 한라인  
-* return 제품 ID
+* return 제품 ID || -1 (제품없음)
 */
-function isValidDataType(line){
+function checkValidDateAndFindDeviceID(line){
     var isValidTime = false;
     var deviceID = -1;
     // 시작 & 종료 시간 Validation
@@ -150,7 +150,13 @@ function isValidDataType(line){
     return !line.includes('N') &&  isValidTime &&line.includes(variableConfig.date) ? deviceId : -1; // Validation 성공하면 장치 ID 반환 , 실패하면 -1 반환
 };
 
-/* 2D array 만들기 @See https://stackoverflow.com/questions/3689903/how-to-create-a-2d-array-of-zeroes-in-javascript */
+
+/* 2D array 만들기  
+* @See https://stackoverflow.com/questions/3689903/how-to-create-a-2d-array-of-zeroes-in-javascript
+* Param : rows(행)
+* Param : cols(열)
+* Param : defaultValue(초기화 값)
+*/
 function matrix( rows, cols, defaultValue){
     var arr = [];
     // Creates all lines:
@@ -167,7 +173,10 @@ function matrix( rows, cols, defaultValue){
   return arr;
   }
 
-
+  /* 제품 아이디에 해당되는 workSheet반환
+  * @Param deviceID : 로그에 찍힌 제품의 아이디
+  * @Return : 각 Device에 해당하는 workSheet반환
+  */
   function getWorkSheetByDeviceID(deviceID){
     var workSheet;
     switch(deviceID){
@@ -200,26 +209,32 @@ function matrix( rows, cols, defaultValue){
   }
 
 fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'utf8').toString().split('\n').forEach(function (line) { 
-    // find device Id which has the valid data
-    var deviceID = isValidDataType(line);
-    if(deviceID > 0 ){  
+    
+    var deviceID = checkValidDateAndFindDeviceID(line);
+    var hasDeviceID = deviceID > -1 ? true : false;
+    if(hasDeviceID){  
         var time = line.substring(12,17);
         var volt=parseFloat (line.substring(32,39));
         var rs = parseFloat(line.substring(44,49)); 
         
+        /* 30초 지났을떄만 평균 값 계산 및 데이터 저장
+        * @Param cntSamplingNumByDevice : doSensor 수행되는 횟수
+        * @Param averageSensorArr : Device ID에 따른 Rs값 저장, 평균을 내기 위한 디바이스별 Rs 저장 (2차배열)
+        * @Param variableConfig.numberOfSamplingForAvg : 파라미터 값에 도달하면 cntSamplingNumByDevice 초기화
+        * @Param avgFlag 30초 지났는지 확인해 주는 Flag  
+        */
         avgFlag[deviceID-1] = false;
-        // 30초 지났을떄 평균 한번 낸다. 
         if(cntSamplingNumByDevice[deviceID-1] == variableConfig.numberOfSamplingForAvg){ 
             avgSensors[deviceID-1] = _.mean(averageSensorArr[deviceID-1]) || 0;
             averageSensorArr[deviceID-1]=[];
             cntSamplingNumByDevice[deviceID-1] = 0;
             avgFlag[deviceID-1] = true;
         }
-
-        averageSensorArr[deviceID-1][cntForAvg].push(rs);
-        cntSamplingNumByDevice[deviceID-1] = cntSamplingNumByDevice[deviceID-1] + 1;
         
-
+        // 평균값임시저장소 -> 30초 지났을떄 위 if 문에서 평균 측정 및 averageSensorArr에 평균값 저장
+        var cntForAvg = cntSamplingNumByDevice[deviceID-1];
+        averageSensorArr[deviceID-1][cntForAvg].push(rs);
+        cntSamplingNumByDevice[deviceID-1] = cntForAvg + 1;
 
         if(line.includes('Volt1')){
             // function doSensor(sensorId,time,volt,rs,averageOfRsValues){
