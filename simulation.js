@@ -49,7 +49,6 @@ var sheet5 = workbook.addWorksheet("Sensor5");
 var sheet6 = workbook.addWorksheet("Sensor6");
 var sheet7 = workbook.addWorksheet("Sensor7");
 var sheet8 = workbook.addWorksheet("Sensor8");
-
 /* getWork Sheet */
 
 var worksheet1 = workbook.getWorksheet("Sensor1");
@@ -60,7 +59,6 @@ var worksheet5 = workbook.getWorksheet("Sensor5");
 var worksheet6 = workbook.getWorksheet("Sensor6");
 var worksheet7 = workbook.getWorksheet("Sensor7");
 var worksheet8 = workbook.getWorksheet("Sensor8");
-
 
 // colum setting 
 var category = [
@@ -177,10 +175,11 @@ function doSensor(sensorId,time,volt,rs,avg){
 function checkValidDateAndFindDeviceID(line){
     var isValidTime = false;
     var deviceID = -1;
+    var time = line.substring(12,17);
     var hours = _.range(variableConfig.startHour,variableConfig.endHour+1); // 시작 시간 종료시간 배열
     // hours돌면서 유효한 시간이 있을경우 isValidTime true 변환
     _.each(hours, function (element, index, list) {
-        var isSameHour = line.includes(element) ? true : false;
+        var isSameHour = time.includes(element) ? true : false;
         isValidTime = (isValidTime || isSameHour)
     });
     // Volt 로 부터 
@@ -243,9 +242,13 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
             console.log("알고리즘 적용안함")
             obj = defaultObj;
         }
-        console.log(JSON.stringify(obj))
-        var sheetName = "Sensor"+String(deviceID);
-        workbook.getWorksheet(sheetName).addRow(obj);
+        if(obj['Led']!="N"){ // 기존 데이터는 데이터가 없으나 마이컴처럼 센서값을 초반부터 받아오는 로직이 없어서 초반 30초간 데이터 제거
+            console.log(JSON.stringify(obj))
+            var sheetName = "Sensor"+String(deviceID);
+            //workbook.getWorksheet(sheetName).addRow(obj);
+            worksheet1.addRow(obj);
+        }
+        
     }
 });
 
