@@ -191,7 +191,7 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
         var rs = Number(line.substring(44,49)); 
         var avg = Number(line.substring(57,61));
         var log = {deviceID:deviceID,time:time,rs:rs,avg:avg};
-        fs.appendFileSync(path.join(__dirname, './data') + '/log1.txt', JSON.stringify(log) + "\n");
+        fs.appendFileSync(path.join(__dirname, './log') + '/'+ logConfig.logFileName , JSON.stringify(log) + "\n");
         console.log(JSON.stringify(log));
         avgFlag[deviceID-1] = false;
         if(cntSamplingNumByDevice[deviceID-1] == variableConfig.numberOfSamplingForAvg - 1){ 
