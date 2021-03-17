@@ -1,3 +1,5 @@
+
+
 // Library
 var fs = require('fs'); 
 var path = require('path'); 
@@ -23,11 +25,11 @@ var variableConfig = {
     startHour : 10, // 시작시간
     endHour : 12,  // 완료시간
     numberOfSamplingForAvg : 6, //5*x 초 , where x = numberOfSamplingForAvg
-    pulse : 500, // 허용범위 +- 진폭
-    timePulse : 1, // 허용 범위 폭 1*30초
+    pulse : 20, // 허용범위 +- 진폭
+    timePulse : 3, // 허용 범위 폭 1*30초
     blueSlope : 0.9, // Blue 
     orangeSlope : 0.85, // Orange
-    referenceDown : 400,
+    referenceDown : 5,
     test : true ,// 테스트 모드 , true : 센서 testSensorNum 만 테스트
     testSensorNum : 1
 };
@@ -107,29 +109,33 @@ var bufferFlag = false;
 
 function doSensor(sensorId,time,volt,rs,avg){
     // clean air
+
+    console.log("average : "+ avg + ", reference"+  reference[sensorId-1] +"buffer:"+buffer[sensorId-1] )
     if(avg > reference[sensorId-1]){
-        console.log('o reference update')
         reference[sensorId-1] = avg;
         threshholdTime[sensorId-1] = 0
     }else{
-        console.log('x reference update')
+        console.log('레퍼런스 값이 평균보다 더큼 -> 레퍼런스 업데이트, 버퍼시간 초기화')
     }
     // adjust buffer zone
-    if(avg > buffer[sensorId-1] + variableConfig.pulse || avg < buffer[sensorId-1] + variableConfig.pulse){
-        console.log('out of the buffer, time :' + time)
+    var max = buffer[sensorId-1]+ Number(variableConfig.pulse);
+    var min = buffer[sensorId-1] - Number(variableConfig.pulse);
+    console.log("버퍼 맥스" + max);
+    console.log("버퍼 최소" + min);
+    if(avg > max || avg < min){
+        console.log('평균이 버퍼 밖에 있음 :' + time)
         buffer[sensorId-1] = avg;
         threshholdTime[sensorId-1] = 0;
         bufferFlag = false;
     }else{
-        console.log('in the buffer, time : ' + time );
-        bufferFlag = true;
-        threshholdTime[sensorId-1]++;  
+        console.log('평균 값이 버퍼 안에 있음  **** : ' + time );
+        threshholdTime[sensorId-1] = threshholdTime[sensorId-1]+1;  
     }
 
     console.log(JSON.stringify(threshholdTime));
 
     // when the avg is in buffer zone, update the reference value
-    if(threshholdTime[sensorId-1] >= variableConfig.timePulse){   
+    if(threshholdTime[sensorId-1] >= variableConfig.timePulse + 1){   
         console.log("reference 다운");
         threshholdTime[sensorId-1] = 0;
         reference[sensorId-1]  = reference[sensorId-1] - variableConfig.referenceDown;
@@ -191,8 +197,8 @@ fs.readFileSync(path.join(__dirname, './data') + fileConfig.teratermTextFile, 'u
         var rs = Number(line.substring(44,49)); 
         var avg = Number(line.substring(57,61));
         var log = {deviceID:deviceID,time:time,rs:rs,avg:avg};
-        fs.appendFileSync(path.join(__dirname, './log') + '/'+ logConfig.logFileName , JSON.stringify(log) + "\n");
-        console.log(JSON.stringify(log));
+        fs.appendFileSync(path.join(__dirname, './log') + '/log1.txt', JSON.stringify(log) + "\n");
+       // console.log(JSON.stringify(log));
         avgFlag[deviceID-1] = false;
         if(cntSamplingNumByDevice[deviceID-1] == variableConfig.numberOfSamplingForAvg - 1){ 
             cntSamplingNumByDevice[deviceID-1] = 0;
