@@ -44,6 +44,8 @@ void DoSensor(void)
     if(Adc.RsCur<Adc.RsBufCur-Pulse || Adc.RsCur>Adc.RsBufCur+Pulse){              
       Time_Pulse=0;
       Adc.RsBufCur=Adc.RsCur;
+    }else{
+      Time_Pulse++;
     }
     /*
     if(PulseFlag==1){

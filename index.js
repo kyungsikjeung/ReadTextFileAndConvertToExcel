@@ -103,7 +103,7 @@ fs.readFileSync(path.join(__dirname, './data') + teratermTextFile, 'utf8').toStr
     // 읽어 들여온 라인데이터 Object 형식으로 변환
     var time = line.substring(12,17);
     var volt=parseFloat (line.substring(32,39));
-    var rs = parseFloat(line.substring(44,49));
+    var rs = Number(line.substring(44,49));
     var obj = {time:time,volt:volt,rs:rs};
     if(line.includes('2021-03-10') && !line.includes('N') ){
         if(line.includes('Volt1')){
