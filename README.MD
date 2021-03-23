@@ -11,3 +11,6 @@ output : csv 파일 출력
 
 // @ see
 https://dev.to/abiodunjames/build-a-todo-app-with-nodejs-expressjs-mongodb-and-vuejs--part-2--3k11
+
+sampledata:
+voc_0311_withPP1.txt
